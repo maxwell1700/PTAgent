@@ -154,7 +154,7 @@ def check_recovery(user_id: str, muscle_group: str) -> dict:
 # Model IDs: https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html
 
 agent = Agent(
-    model="us.anthropic.claude-sonnet-4-5",
+    model="us.anthropic.claude-haiku-4-5",
     system_prompt=SYSTEM_PROMPT,
     tools=[get_plan, log_session, update_plan, get_history, check_recovery],
 )

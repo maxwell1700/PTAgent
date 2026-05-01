@@ -41,7 +41,7 @@ from aws_cdk import (
     aws_apigateway as apigateway,
     aws_ssm as ssm,
     aws_s3_assets as s3_assets,
-    CfnResource,
+    aws_bedrockagentcore as agentcore,
     CfnOutput,
 )
 from constructs import Construct
@@ -140,7 +140,10 @@ class PtAgentStack(Stack):
         agent_role.add_to_policy(
             iam.PolicyStatement(
                 actions=["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
-                resources=["arn:aws:bedrock:*::foundation-model/anthropic.claude-*"],
+                resources=[
+                    "arn:aws:bedrock:*::foundation-model/*",
+                    f"arn:aws:bedrock:{self.region}:{self.account}:*",
+                ],
             )
         )
 
@@ -156,9 +159,9 @@ class PtAgentStack(Stack):
         agent_role.add_to_policy(
             iam.PolicyStatement(
                 actions=["logs:DescribeLogGroups"],
-                resources=[
-                    f"arn:aws:logs:{self.region}:{self.account}:log-group:/aws/bedrock-agentcore/*"
-                ],
+                # Docs require broader scope here — AgentCore enumerates log groups
+                # across the account to find its own, not just within its prefix.
+                resources=[f"arn:aws:logs:{self.region}:{self.account}:log-group:*"],
             )
         )
         agent_role.add_to_policy(
@@ -196,45 +199,40 @@ class PtAgentStack(Stack):
         agent_asset.grant_read(agent_role)
 
         # -------------------------------------------------------------------
-        # AgentCore Runtime — L1 CfnResource (no L2 construct exists yet)
+        # AgentCore Runtime — agentcore.CfnRuntime (L1 construct)
         # -------------------------------------------------------------------
-        # AWS::BedrockAgentCore::Runtime provisions the managed runtime that
-        # hosts your agent code. AgentCore downloads the ZIP from S3, installs
-        # it, and runs pt_agent.py as the server process.
+        # CfnRuntime is the proper L1 for AWS::BedrockAgentCore::Runtime.
+        # It downloads the ZIP from S3, installs it, and runs pt_agent.py.
         #
-        # NetworkMode PUBLIC means no VPC required — suitable for MVP since
-        # DynamoDB uses IAM auth and has a public endpoint.
-        # Switch to VPC mode when adding RDS (Postgres) which requires private networking.
+        # NetworkMode PUBLIC — no VPC required for MVP since DynamoDB uses
+        # IAM auth with a public endpoint. Switch to VPC when adding RDS.
         #
-        # EntryPoint must match the filename at the root of your ZIP — pt_agent.py
+        # EntryPoint must be the filename at the root of the ZIP — pt_agent.py
         # is the file that defines @app.entrypoint and calls app.run().
 
-        agent_runtime = CfnResource(
+        agent_runtime = agentcore.CfnRuntime(
             self,
             "PtAgentRuntime",
-            type="AWS::BedrockAgentCore::Runtime",
-            properties={
-                "AgentRuntimeName": "pt-agent",
-                "Description": "PT assistant — tracks workouts, recommends progression",
-                "RoleArn": agent_role.role_arn,
-                "NetworkConfiguration": {
-                    "NetworkMode": "PUBLIC",
-                },
-                "AgentRuntimeArtifact": {
-                    "CodeConfiguration": {
-                        "Code": {
-                            "S3": {
-                                "Bucket": agent_asset.s3_bucket_name,
-                                "Prefix": agent_asset.s3_object_key,
-                            }
-                        },
-                        "EntryPoint": ["pt_agent.py"],
-                        "Runtime": "PYTHON_3_12",
-                    }
-                },
-                "EnvironmentVariables": {
-                    "WORKOUT_TABLE_NAME": workout_table.table_name,
-                },
+            agent_runtime_name="pt-agent",
+            description="PT assistant — tracks workouts, recommends progression",
+            role_arn=agent_role.role_arn,
+            network_configuration=agentcore.CfnRuntime.NetworkConfigurationProperty(
+                network_mode="PUBLIC",
+            ),
+            agent_runtime_artifact=agentcore.CfnRuntime.AgentRuntimeArtifactProperty(
+                code_configuration=agentcore.CfnRuntime.CodeConfigurationProperty(
+                    code=agentcore.CfnRuntime.CodeProperty(
+                        s3=agentcore.CfnRuntime.S3LocationProperty(
+                            bucket=agent_asset.s3_bucket_name,
+                            prefix=agent_asset.s3_object_key,
+                        )
+                    ),
+                    entry_point=["pt_agent.py"],
+                    runtime="PYTHON_3_12",
+                )
+            ),
+            environment_variables={
+                "WORKOUT_TABLE_NAME": workout_table.table_name,
             },
         )
 
@@ -282,7 +280,7 @@ class PtAgentStack(Stack):
                 # MANUAL: message @userinfobot on Telegram to get your user ID
                 "ALLOWED_USER_IDS": "REPLACE_WITH_YOUR_TELEGRAM_USER_ID",
                 # MANUAL: set to AgentRuntimeArn output after first cdk deploy
-                "AGENT_RUNTIME_ARN": agent_runtime.get_att("AgentRuntimeArn").to_string(),
+                "AGENT_RUNTIME_ARN": agent_runtime.attr_agent_runtime_arn,
             },
         )
 
@@ -293,7 +291,7 @@ class PtAgentStack(Stack):
         telegram_lambda.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["bedrock-agentcore:InvokeAgentRuntime"],
-                resources=[agent_runtime.get_att("AgentRuntimeArn").to_string()],
+                resources=[agent_runtime.attr_agent_runtime_arn],
             )
         )
 
@@ -323,7 +321,7 @@ class PtAgentStack(Stack):
         CfnOutput(
             self,
             "AgentRuntimeArn",
-            value=agent_runtime.get_att("AgentRuntimeArn").to_string(),
+            value=agent_runtime.attr_agent_runtime_arn,
             description="Use this ARN in the Telegram Lambda AGENT_RUNTIME_ARN env var",
         )
         CfnOutput(
