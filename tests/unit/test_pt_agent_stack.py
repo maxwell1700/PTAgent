@@ -1,7 +1,7 @@
 import aws_cdk as core
 import aws_cdk.assertions as assertions
 
-from pt_agent.pt_agent_stack import PtAgentStack
+from infra.pt_agent_stack import PtAgentStack
 
 # example tests. To run these tests, uncomment this file along with the example
 # resource in pt_agent/pt_agent_stack.py

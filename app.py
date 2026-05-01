@@ -3,7 +3,7 @@ import os
 
 import aws_cdk as cdk
 
-from pt_agent.pt_agent_stack import PtAgentStack
+from infra.pt_agent_stack import PtAgentStack
 
 
 app = cdk.App()

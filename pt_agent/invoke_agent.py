@@ -1,1 +1,0 @@
-# configuration for local agent testing once deployed to aws 
