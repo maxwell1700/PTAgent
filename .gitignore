@@ -4,6 +4,8 @@ __pycache__
 .pytest_cache
 .venv
 *.egg-info
+.env
+.source
 
 # CDK asset staging directory
 .cdk.staging
