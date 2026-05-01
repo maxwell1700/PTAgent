@@ -64,14 +64,14 @@ def invoke(payload: dict) -> str:
         data=data,
         headers={"Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(req) as response:
+    with urllib.request.urlopen(req) as response:  # nosec B310 — URL is always http://127.0.0.1 (local dev only)
         return response.read().decode()
 
 
 def ping() -> bool:
     """Check if the agent server is running."""
     try:
-        with urllib.request.urlopen(f"{BASE_URL}/ping") as response:
+        with urllib.request.urlopen(f"{BASE_URL}/ping") as response:  # nosec B310 — local dev only
             body = json.loads(response.read())
             return body.get("status") == "Healthy"
     except Exception:

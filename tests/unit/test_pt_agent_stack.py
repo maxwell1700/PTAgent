@@ -8,7 +8,7 @@ from infra.pt_agent_stack import PtAgentStack
 def test_sqs_queue_created():
     app = core.App()
     stack = PtAgentStack(app, "pt-agent")
-    template = assertions.Template.from_stack(stack)
+    assertions.Template.from_stack(stack)
 
 #     template.has_resource_properties("AWS::SQS::Queue", {
 #         "VisibilityTimeout": 300
