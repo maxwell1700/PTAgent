@@ -139,7 +139,8 @@ def get_recent_history(user_id: str, muscle_group: str, limit: int = 5) -> dict:
     )
 
     sessions = [
-        item for item in result.get("Items", [])
+        item
+        for item in result.get("Items", [])
         if item.get("muscle_group") == muscle_group.lower()
     ][:limit]
 

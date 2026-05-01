@@ -3,12 +3,14 @@ import aws_cdk.assertions as assertions
 
 from infra.pt_agent_stack import PtAgentStack
 
+
 # example tests. To run these tests, uncomment this file along with the example
 # resource in pt_agent/pt_agent_stack.py
 def test_sqs_queue_created():
     app = core.App()
     stack = PtAgentStack(app, "pt-agent")
     assertions.Template.from_stack(stack)
+
 
 #     template.has_resource_properties("AWS::SQS::Queue", {
 #         "VisibilityTimeout": 300

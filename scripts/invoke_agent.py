@@ -37,7 +37,10 @@ TEST_CASES = [
     },
     {
         "description": "Add exercises to a day (agent path — LLM reasons)",
-        "payload": {"user_id": "test-user-1", "prompt": "add delts to my tuesday workout"},
+        "payload": {
+            "user_id": "test-user-1",
+            "prompt": "add delts to my tuesday workout",
+        },
     },
     {
         "description": "Log a completed session (agent path — LLM parses and calls log_session)",

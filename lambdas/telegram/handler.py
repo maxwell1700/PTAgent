@@ -65,7 +65,9 @@ def _send_telegram_message(chat_id: int, text: str) -> None:
     token = _get_bot_token()
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = json.dumps({"chat_id": chat_id, "text": text}).encode()
-    req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+    req = urllib.request.Request(
+        url, data=payload, headers={"Content-Type": "application/json"}
+    )
     urllib.request.urlopen(req)  # nosec B310 — URL is always https://api.telegram.org
 
 

@@ -51,6 +51,7 @@ app = BedrockAgentCoreApp()
 # For simple, predictable intents this is cheaper, faster, and more reliable.
 # The LLM is reserved for cases that require reasoning and creativity.
 
+
 def classify_intent(prompt: str) -> str:
     """
     Route the user's message to a handler without using the LLM.
@@ -80,6 +81,7 @@ def classify_intent(prompt: str) -> str:
 #
 # Note: these are thin wrappers. All DynamoDB logic lives in workout_tools.py
 # so it can be swapped out (e.g. to Postgres) without touching this file.
+
 
 @tool
 def get_plan(user_id: str, day_of_week: str | None = None) -> dict:
@@ -171,6 +173,7 @@ agent = Agent(
 #     "user_id": "telegram-123456789",
 #     "prompt": "what is my routine today"
 #   }
+
 
 @app.entrypoint
 def handle(payload: dict) -> str:

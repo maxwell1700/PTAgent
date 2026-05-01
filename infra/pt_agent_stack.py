@@ -48,7 +48,6 @@ from constructs import Construct
 
 
 class PtAgentStack(Stack):
-
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
@@ -65,7 +64,9 @@ class PtAgentStack(Stack):
         workout_table = dynamodb.Table(
             self,
             "WorkoutTable",
-            partition_key=dynamodb.Attribute(name="PK", type=dynamodb.AttributeType.STRING),
+            partition_key=dynamodb.Attribute(
+                name="PK", type=dynamodb.AttributeType.STRING
+            ),
             sort_key=dynamodb.Attribute(name="SK", type=dynamodb.AttributeType.STRING),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.RETAIN,
@@ -120,7 +121,9 @@ class PtAgentStack(Stack):
         agent_role = iam.Role(
             self,
             "PtAgentRole",
-            assumed_by=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com").with_conditions(
+            assumed_by=iam.ServicePrincipal(
+                "bedrock-agentcore.amazonaws.com"
+            ).with_conditions(
                 {
                     "StringEquals": {"aws:SourceAccount": self.account},
                     "ArnLike": {
@@ -139,7 +142,10 @@ class PtAgentStack(Stack):
         # Go to: AWS Console -> Bedrock -> Model access -> Enable Claude Sonnet
         agent_role.add_to_policy(
             iam.PolicyStatement(
-                actions=["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+                actions=[
+                    "bedrock:InvokeModel",
+                    "bedrock:InvokeModelWithResponseStream",
+                ],
                 resources=[
                     "arn:aws:bedrock:*::foundation-model/*",
                     f"arn:aws:bedrock:{self.region}:{self.account}:*",
@@ -191,7 +197,9 @@ class PtAgentStack(Stack):
             iam.PolicyStatement(
                 actions=["cloudwatch:PutMetricData"],
                 resources=["*"],
-                conditions={"StringEquals": {"cloudwatch:namespace": "bedrock-agentcore"}},
+                conditions={
+                    "StringEquals": {"cloudwatch:namespace": "bedrock-agentcore"}
+                },
             )
         )
 
