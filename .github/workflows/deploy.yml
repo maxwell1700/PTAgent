@@ -111,9 +111,6 @@ jobs:
         env:
           CDK_DEFAULT_ACCOUNT: ${{ env.AWS_ACCOUNT_ID }}
           CDK_DEFAULT_REGION: ${{ env.AWS_REGION }}
-          # Synth reads this to wire the env var into the Lambda — must be present
-          # even in synth to avoid a missing env var error in the stack code.
-          ALLOWED_USER_IDS: ${{ secrets.ALLOWED_USER_IDS }}
 
   # ── 5. Deploy (main only) ──────────────────────────────────────────────────
   deploy:
@@ -166,4 +163,3 @@ jobs:
         env:
           CDK_DEFAULT_ACCOUNT: ${{ env.AWS_ACCOUNT_ID }}
           CDK_DEFAULT_REGION: ${{ env.AWS_REGION }}
-          ALLOWED_USER_IDS: ${{ secrets.ALLOWED_USER_IDS }}
