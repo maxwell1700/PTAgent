@@ -1,0 +1,165 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  AWS_REGION: us-east-1
+  # Pinned to 3.12 — matches the AgentCore runtime and local venv.
+  # Do not bump without also updating AgentRuntimeArtifact.Runtime in pt_agent_stack.py.
+  PYTHON_VERSION: "3.12"
+
+jobs:
+
+  # ── 1. Lint ────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - run: pip install ruff
+      - run: ruff check .
+      - run: ruff format --check .
+
+  # ── 2. Security ────────────────────────────────────────────────────────────
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install security tools
+        run: pip install bandit pip-audit
+
+      - name: Bandit — static analysis (SAST)
+        # Scans infra (CDK stack), lambdas, runtime (agent + tools), and scripts
+        run: bandit -r infra/ lambdas/ runtime/ scripts/ -ll
+
+      - name: pip-audit — CDK deps
+        run: pip-audit -r requirements.txt
+
+      - name: pip-audit — agent runtime deps
+        run: pip-audit -r runtime/requirements.txt
+
+      - name: pip-audit — Lambda deps
+        run: |
+          for req in lambdas/*/requirements.txt; do
+            echo "Scanning $req"
+            pip-audit -r "$req"
+          done
+
+  # ── 3. Test ────────────────────────────────────────────────────────────────
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run tests
+        run: pytest tests/
+
+  # ── 4. Synth ───────────────────────────────────────────────────────────────
+  synth:
+    name: CDK Synth
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Install CDK CLI
+        run: npm install -g aws-cdk
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: CDK Synth
+        # --no-bundling skips the Docker asset packaging step during synth.
+        # We only need to verify the CloudFormation template compiles cleanly here.
+        # The actual Docker bundling (zipping the agent code) happens during deploy.
+        run: cdk synth --no-bundling
+        env:
+          CDK_DEFAULT_ACCOUNT: ${{ env.AWS_ACCOUNT_ID }}
+          CDK_DEFAULT_REGION: ${{ env.AWS_REGION }}
+
+  # ── 5. Deploy (main only) ──────────────────────────────────────────────────
+  deploy:
+    name: Deploy
+    needs: [lint, security, test, synth]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # required for OIDC
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Install CDK CLI
+        run: npm install -g aws-cdk
+
+      - name: Install CDK dependencies
+        run: pip install -r requirements.txt
+
+      - name: Package Lambda dependencies
+        # Pre-installs Lambda deps into each Lambda directory so CDK bundles them correctly.
+        # The agent runtime code is packaged separately by CDK's Docker bundling step.
+        run: |
+          for lambda_dir in lambdas/*/; do
+            if [ -f "$lambda_dir/requirements.txt" ]; then
+              echo "Packaging $lambda_dir"
+              pip install -r "$lambda_dir/requirements.txt" -t "$lambda_dir" --upgrade --quiet
+            fi
+          done
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: CDK Deploy
+        # Docker is available on ubuntu-latest — the agent code bundling step
+        # (s3_assets.Asset in pt_agent_stack.py) will run automatically here.
+        run: cdk deploy --require-approval never
+        env:
+          CDK_DEFAULT_ACCOUNT: ${{ env.AWS_ACCOUNT_ID }}
+          CDK_DEFAULT_REGION: ${{ env.AWS_REGION }}

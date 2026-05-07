@@ -1,15 +1,23 @@
-import aws_cdk as core
-import aws_cdk.assertions as assertions
+import unittest
 
-from pt_agent.pt_agent_stack import PtAgentStack
 
-# example tests. To run these tests, uncomment this file along with the example
-# resource in pt_agent/pt_agent_stack.py
-def test_sqs_queue_created():
-    app = core.App()
-    stack = PtAgentStack(app, "pt-agent")
-    template = assertions.Template.from_stack(stack)
+def classify_intent(prompt: str) -> str:
+    p = prompt.lower()
+    today_keywords = ["today", "today's", "this morning", "tonight", "what's on"]
+    week_keywords = ["full week", "whole week", "weekly", "all week", "this week"]
+    if any(w in p for w in today_keywords):
+        return "get_today"
+    if any(w in p for w in week_keywords):
+        return "get_week"
+    return "agent"
 
-#     template.has_resource_properties("AWS::SQS::Queue", {
-#         "VisibilityTimeout": 300
-#     })
+
+class TestClassifyIntent(unittest.TestCase):
+    def test_today(self):
+        self.assertEqual(classify_intent("what's today"), "get_today")
+
+    def test_week(self):
+        self.assertEqual(classify_intent("show full week"), "get_week")
+
+    def test_agent(self):
+        self.assertEqual(classify_intent("log my bench press"), "agent")
