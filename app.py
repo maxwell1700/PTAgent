@@ -13,7 +13,6 @@ PtAgentStack(
         account=os.getenv("CDK_DEFAULT_ACCOUNT"),
         region=os.getenv("CDK_DEFAULT_REGION"),
     ),
-    
 )
 
 app.synth()
