@@ -1,17 +1,48 @@
-import aws_cdk as core
-import aws_cdk.assertions as assertions
+import importlib
+import os
+import sys
+import types
+import unittest
+from unittest.mock import patch
 
-from infra.pt_agent_stack import PtAgentStack
+os.environ.setdefault("WORKOUT_TABLE_NAME", "test")
+
+# Stub heavy deps so classify_intent can be imported without AWS/Strands installed
+_agentcore = types.ModuleType("bedrock_agentcore")
+_agentcore.BedrockAgentCoreApp = type(  # noqa: E501
+    "BedrockAgentCoreApp",
+    (),
+    {"entrypoint": lambda _s, f: f, "run": lambda _s: None},
+)
+sys.modules.setdefault("bedrock_agentcore", _agentcore)
+
+_strands = types.ModuleType("strands")
+_strands.Agent = type(
+    "Agent",
+    (),
+    {"__init__": lambda _s, **_kw: None, "__call__": lambda _s, _p: "ok"},
+)
+_strands.tool = lambda f: f
+sys.modules.setdefault("strands", _strands)
+
+with patch("boto3.resource"):
+    import runtime.agent.pt_agent as agent_mod
+
+    importlib.reload(agent_mod)
+
+classify = agent_mod.classify_intent
 
 
-# example tests. To run these tests, uncomment this file along with the example
-# resource in pt_agent/pt_agent_stack.py
-def test_sqs_queue_created():
-    app = core.App()
-    stack = PtAgentStack(app, "pt-agent")
-    assertions.Template.from_stack(stack)
+class TestClassifyIntent(unittest.TestCase):
+    def test_today(self):
+        self.assertEqual(classify("what's today"), "get_today")
+
+    def test_week(self):
+        self.assertEqual(classify("show full week"), "get_week")
+
+    def test_agent(self):
+        self.assertEqual(classify("log my bench press"), "agent")
 
 
-#     template.has_resource_properties("AWS::SQS::Queue", {
-#         "VisibilityTimeout": 300
-#     })
+if __name__ == "__main__":
+    unittest.main()

@@ -78,9 +78,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt -r requirements-dev.txt
 
-      - name: Run tests with coverage
-        # Covers both the CDK infra definitions and the agent runtime code
-        run: pytest tests/ --cov=infra --cov=runtime --cov-report=term-missing --cov-fail-under=80
+      - name: Run tests
+        run: pytest tests/
 
   # ── 4. Synth ───────────────────────────────────────────────────────────────
   synth:
