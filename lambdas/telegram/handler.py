@@ -35,12 +35,9 @@ logger.setLevel(logging.INFO)
 # Config — all injected by CDK as Lambda environment variables
 # ---------------------------------------------------------------------------
 
-# SSM parameter name where your Telegram bot token is stored securely
+# SSM parameter names — values fetched at cold start, not stored in env vars
 BOT_TOKEN_PARAM = os.environ["BOT_TOKEN_PARAM"]
-
-# Comma-separated list of allowed Telegram user IDs e.g. "123456789,987654321"
-# MANUAL: set this env var in CDK to your own Telegram user ID
-ALLOWED_USER_IDS = set(os.environ.get("ALLOWED_USER_IDS", "").split(","))
+ALLOWED_USER_IDS_PARAM = os.environ["ALLOWED_USER_IDS_PARAM"]
 
 # AgentCore runtime endpoint — injected by CDK after agent is deployed
 # MANUAL: update this after deploying the AgentCore agent runtime
@@ -49,15 +46,23 @@ AGENT_REGION = os.environ.get("AWS_REGION", "us-east-1")
 
 _ssm = boto3.client("ssm")
 _bot_token: str | None = None
+_allowed_user_ids: set[str] | None = None
 
 
 def _get_bot_token() -> str:
-    """Fetch bot token from SSM — cached for the Lambda container lifetime."""
     global _bot_token
     if _bot_token is None:
         response = _ssm.get_parameter(Name=BOT_TOKEN_PARAM, WithDecryption=True)
         _bot_token = response["Parameter"]["Value"]
     return _bot_token
+
+
+def _get_allowed_user_ids() -> set[str]:
+    global _allowed_user_ids
+    if _allowed_user_ids is None:
+        response = _ssm.get_parameter(Name=ALLOWED_USER_IDS_PARAM, WithDecryption=False)
+        _allowed_user_ids = set(response["Parameter"]["Value"].split(","))
+    return _allowed_user_ids
 
 
 def _send_telegram_message(chat_id: int, text: str) -> None:
@@ -112,7 +117,8 @@ def handler(event: dict, context) -> dict:
             return {"statusCode": 200, "body": "ok"}
 
         # Silently ignore anyone not on the whitelist
-        if ALLOWED_USER_IDS and user_id not in ALLOWED_USER_IDS:
+        allowed = _get_allowed_user_ids()
+        if allowed and user_id not in allowed:
             logger.warning(f"Blocked unauthorised user: {user_id}")
             return {"statusCode": 200, "body": "ok"}
 

@@ -11,11 +11,12 @@ What this stack provisions:
   - Lambda function for the Telegram webhook
   - API Gateway HTTP endpoint that Telegram calls
 
-What requires manual steps after deployment:
+What requires manual steps before deploying:
   1. Enable Claude Sonnet in Bedrock Model Access (one-time, AWS console)
-  2. Store your Telegram bot token in SSM (aws ssm put-parameter ...)
-  3. Set ALLOWED_USER_IDS and AGENT_RUNTIME_ARN in this file before deploying
-  4. Register the Telegram webhook URL with BotFather
+  2. Create SSM parameters (see comments near bot_token_param below)
+
+What requires manual steps after deployment:
+  3. Register the Telegram webhook URL with BotFather
 
 Note on code packaging:
   CDK uses Docker during `cdk deploy` to bundle runtime/agent/ and its dependencies
@@ -257,12 +258,30 @@ class PtAgentStack(Stack):
         #     --type SecureString \
         #     --overwrite
 
-        bot_token_param = ssm.StringParameter(
+        # These parameters must be created manually before deploying:
+        #
+        #   aws ssm put-parameter \
+        #     --name /pt-agent/telegram-bot-token \
+        #     --value "<YOUR_BOT_TOKEN>" \
+        #     --type SecureString
+        #
+        #   aws ssm put-parameter \
+        #     --name /pt-agent/allowed-user-ids \
+        #     --value "123456789,987654321" \
+        #     --type String
+        #
+        # Get your bot token from @BotFather and your user ID from @userinfobot.
+
+        bot_token_param = ssm.StringParameter.from_string_parameter_name(
             self,
             "TelegramBotToken",
-            parameter_name="/pt-agent/telegram-bot-token",
-            string_value="PLACEHOLDER — replace via AWS CLI after deploy",
-            description="Telegram bot token from @BotFather",
+            string_parameter_name="/pt-agent/telegram-bot-token",
+        )
+
+        allowed_users_param = ssm.StringParameter.from_string_parameter_name(
+            self,
+            "TelegramAllowedUserIds",
+            string_parameter_name="/pt-agent/allowed-user-ids",
         )
 
         # -------------------------------------------------------------------
@@ -271,9 +290,6 @@ class PtAgentStack(Stack):
         # Receives Telegram messages, checks the user whitelist, and forwards
         # to the AgentCore runtime.
         #
-        # MANUAL STEP 3: before deploying, fill in these two values:
-        #   ALLOWED_USER_IDS — your Telegram user ID from @userinfobot
-        #   AGENT_RUNTIME_ARN — printed in stack outputs after first deploy
 
         telegram_lambda = lambda_.Function(
             self,
@@ -285,15 +301,14 @@ class PtAgentStack(Stack):
             environment={
                 "BOT_TOKEN_PARAM": bot_token_param.parameter_name,
                 "WORKOUT_TABLE_NAME": workout_table.table_name,
-                # MANUAL: message @userinfobot on Telegram to get your user ID
-                "ALLOWED_USER_IDS": "REPLACE_WITH_YOUR_TELEGRAM_USER_ID",
-                # MANUAL: set to AgentRuntimeArn output after first cdk deploy
+                "ALLOWED_USER_IDS_PARAM": allowed_users_param.parameter_name,
                 "AGENT_RUNTIME_ARN": agent_runtime.attr_agent_runtime_arn,
             },
         )
 
-        # Allow Lambda to read the bot token from SSM
+        # Allow Lambda to read bot token and allowed user IDs from SSM
         bot_token_param.grant_read(telegram_lambda)
+        allowed_users_param.grant_read(telegram_lambda)
 
         # Allow Lambda to invoke the AgentCore runtime
         telegram_lambda.add_to_role_policy(
