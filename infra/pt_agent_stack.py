@@ -222,7 +222,7 @@ class PtAgentStack(Stack):
         agent_runtime = agentcore.CfnRuntime(
             self,
             "PtAgentRuntime",
-            agent_runtime_name="pt-agent",
+            agent_runtime_name="pt_agent",
             description="PT assistant — tracks workouts, recommends progression",
             role_arn=agent_role.role_arn,
             network_configuration=agentcore.CfnRuntime.NetworkConfigurationProperty(
