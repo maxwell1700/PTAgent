@@ -44,8 +44,11 @@ from tools.workout_tools import (
 
 app = BedrockAgentCoreApp()
 
-_ssm = boto3.client("ssm")
-_model_id: str = _ssm.get_parameter(Name="/pt-agent/model-id")["Parameter"]["Value"]
+def _get_ssm_param(name: str) -> str:
+    return boto3.client("ssm").get_parameter(Name=name)["Parameter"]["Value"]
+
+
+_model_id = _get_ssm_param("/pt-agent/model-id")
 
 
 # ---------------------------------------------------------------------------
