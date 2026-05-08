@@ -284,12 +284,6 @@ class PtAgentStack(Stack):
             string_parameter_name="/pt-agent/allowed-user-ids",
         )
 
-        model_id_param = ssm.StringParameter.from_string_parameter_name(
-            self,
-            "AgentModelId",
-            string_parameter_name="/pt-agent/model-id",
-        )
-
         # -------------------------------------------------------------------
         # Telegram webhook Lambda
         # -------------------------------------------------------------------
@@ -315,7 +309,6 @@ class PtAgentStack(Stack):
         # Allow Lambda to read bot token and allowed user IDs from SSM
         bot_token_param.grant_read(telegram_lambda)
         allowed_users_param.grant_read(telegram_lambda)
-        model_id_param.grant_read(agent_role)
 
         # Allow Lambda to invoke the AgentCore runtime
         telegram_lambda.add_to_role_policy(
