@@ -32,8 +32,8 @@ from datetime import datetime
 from bedrock_agentcore import BedrockAgentCoreApp
 from strands import Agent, tool
 
-from .prompts import SYSTEM_PROMPT
-from .tools.workout_tools import (
+from prompts import SYSTEM_PROMPT
+from tools.workout_tools import (
     get_workout_plan,
     log_workout,
     update_workout_plan,
