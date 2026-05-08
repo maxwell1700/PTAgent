@@ -97,11 +97,11 @@ class PtAgentStack(Stack):
                     "-c",
                     # Install dependencies directly into /asset-output so they
                     # are included in the ZIP alongside the agent code.
-                    # x86_64 platform targeting ensures compatibility with AgentCore's runtime.
+                    # ARM64 platform targeting — AgentCore runs on Linux ARM64.
                     """
                     pip install \
                         --target /asset-output \
-                        --platform manylinux2014_x86_64 \
+                        --platform manylinux2014_aarch64 \
                         --only-binary=:all: \
                         --python-version 312 \
                         -r /asset-input/requirements.txt \
