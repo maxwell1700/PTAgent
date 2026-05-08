@@ -97,7 +97,7 @@ class PtAgentStack(Stack):
                     "-c",
                     # Install dependencies directly into /asset-output so they
                     # are included in the ZIP alongside the agent code.
-                    # ARM64 platform targeting — AgentCore runs on Linux ARM64.
+                    # x86_64 platform targeting ensures compatibility with AgentCore's runtime.
                     """
                     pip install \
                         --target /asset-output \
@@ -314,7 +314,10 @@ class PtAgentStack(Stack):
         telegram_lambda.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["bedrock-agentcore:InvokeAgentRuntime"],
-                resources=[agent_runtime.attr_agent_runtime_arn],
+                resources=[
+                    agent_runtime.attr_agent_runtime_arn,
+                    f"{agent_runtime.attr_agent_runtime_arn}/runtime-endpoint/DEFAULT",
+                ],
             )
         )
 
