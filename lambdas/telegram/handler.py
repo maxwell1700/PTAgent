@@ -87,7 +87,7 @@ def _invoke_agent(user_id: str, prompt: str) -> str:
 
     response = client.invoke_agent_runtime(
         agentRuntimeArn=AGENT_RUNTIME_ID,
-        runtimeSessionId=f"telegram-{user_id}",  # session_id scopes conversation memory per user
+        runtimeSessionId=f"telegram-{user_id}-session-persistent",
         payload=json.dumps({"user_id": user_id, "prompt": prompt}),
     )
 
