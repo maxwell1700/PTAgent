@@ -29,7 +29,6 @@ Flow:
 """
 
 from datetime import datetime
-import boto3
 from bedrock_agentcore import BedrockAgentCoreApp
 from strands import Agent, tool
 
@@ -45,11 +44,7 @@ from tools.workout_tools import (
 app = BedrockAgentCoreApp()
 
 
-def _get_ssm_param(name: str) -> str:
-    return boto3.client("ssm").get_parameter(Name=name)["Parameter"]["Value"]
-
-
-_model_id = _get_ssm_param("/pt-agent/model-id")
+_model_id = "us.anthropic.claude-haiku-4-5-20251001"
 
 
 # ---------------------------------------------------------------------------
