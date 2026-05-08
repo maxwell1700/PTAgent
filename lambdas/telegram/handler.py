@@ -41,7 +41,7 @@ ALLOWED_USER_IDS_PARAM = os.environ["ALLOWED_USER_IDS_PARAM"]
 
 # AgentCore runtime endpoint — injected by CDK after agent is deployed
 # MANUAL: update this after deploying the AgentCore agent runtime
-AGENT_RUNTIME_ID = os.environ.get("AGENT_RUNTIME_ID", "")
+AGENT_RUNTIME_ID = os.environ.get("AGENT_RUNTIME_ARN")
 AGENT_REGION = os.environ.get("AWS_REGION", "us-east-1")
 
 _ssm = boto3.client("ssm")
@@ -86,8 +86,8 @@ def _invoke_agent(user_id: str, prompt: str) -> str:
     client = boto3.client("bedrock-agentcore", region_name=AGENT_REGION)
 
     response = client.invoke_agent_runtime(
-        agentRuntimeId=AGENT_RUNTIME_ID,
-        sessionId=f"telegram-{user_id}",  # session_id scopes conversation memory per user
+        agentRuntimeArn=AGENT_RUNTIME_ID,
+        runtimeSessionId=f"telegram-{user_id}",  # session_id scopes conversation memory per user
         payload=json.dumps({"user_id": user_id, "prompt": prompt}),
     )
 
