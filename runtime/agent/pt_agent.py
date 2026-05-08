@@ -29,6 +29,7 @@ Flow:
 """
 
 from datetime import datetime
+import boto3
 from bedrock_agentcore import BedrockAgentCoreApp
 from strands import Agent, tool
 
@@ -42,6 +43,13 @@ from tools.workout_tools import (
 )
 
 app = BedrockAgentCoreApp()
+
+
+def _get_ssm_param(name: str) -> str:
+    return boto3.client("ssm").get_parameter(Name=name)["Parameter"]["Value"]
+
+
+_model_id = _get_ssm_param("/pt-agent/model-id")
 
 
 # ---------------------------------------------------------------------------
@@ -156,7 +164,7 @@ def check_recovery(user_id: str, muscle_group: str) -> dict:
 # Model IDs: https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html
 
 agent = Agent(
-    model="us.anthropic.claude-haiku-4-5",
+    model=_model_id,
     system_prompt=SYSTEM_PROMPT,
     tools=[get_plan, log_session, update_plan, get_history, check_recovery],
 )
