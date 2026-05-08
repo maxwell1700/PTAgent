@@ -80,14 +80,10 @@ def _invoke_agent(user_id: str, prompt: str) -> str:
     """
     Call the AgentCore agent runtime with the user's message.
 
-    AgentCore exposes an invoke API via the bedrock-agentcore-runtime boto3 client.
+    AgentCore exposes an invoke API via the bedrock-agentcore boto3 client.
     The payload shape matches what @app.entrypoint expects in pt_agent.py.
-
-    MANUAL: verify the exact method name and parameters against the AWS docs
-    as AgentCore is a new service and the SDK may have been updated.
-    Docs: https://docs.aws.amazon.com/bedrock/latest/userguide/agentcore.html
     """
-    client = boto3.client("bedrock-agentcore-runtime", region_name=AGENT_REGION)
+    client = boto3.client("bedrock-agentcore", region_name=AGENT_REGION)
 
     response = client.invoke_agent_runtime(
         agentRuntimeId=AGENT_RUNTIME_ID,
