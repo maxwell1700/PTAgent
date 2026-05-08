@@ -310,7 +310,6 @@ class PtAgentStack(Stack):
         bot_token_param.grant_read(telegram_lambda)
         allowed_users_param.grant_read(telegram_lambda)
 
-
         # Allow Lambda to invoke the AgentCore runtime
         telegram_lambda.add_to_role_policy(
             iam.PolicyStatement(
