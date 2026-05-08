@@ -39,8 +39,10 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     aws_iam as iam,
     aws_lambda as lambda_,
+    aws_lambda_event_sources as lambda_event_sources,
     aws_apigateway as apigateway,
     aws_ssm as ssm,
+    aws_sqs as sqs,
     aws_s3_assets as s3_assets,
     aws_bedrockagentcore as agentcore,
     CfnOutput,
@@ -285,11 +287,25 @@ class PtAgentStack(Stack):
         )
 
         # -------------------------------------------------------------------
-        # Telegram webhook Lambda
+        # SQS — decouples webhook receiver from AgentCore processing
         # -------------------------------------------------------------------
-        # Receives Telegram messages, checks the user whitelist, and forwards
-        # to the AgentCore runtime.
-        #
+
+        dlq = sqs.Queue(
+            self,
+            "ProcessorDLQ",
+            retention_period=cdk.Duration.days(14),
+        )
+
+        queue = sqs.Queue(
+            self,
+            "MessageQueue",
+            visibility_timeout=cdk.Duration.seconds(90),
+            dead_letter_queue=sqs.DeadLetterQueue(max_receive_count=3, queue=dlq),
+        )
+
+        # -------------------------------------------------------------------
+        # Telegram webhook receiver Lambda — validates, whitelists, enqueues
+        # -------------------------------------------------------------------
 
         telegram_lambda = lambda_.Function(
             self,
@@ -297,21 +313,43 @@ class PtAgentStack(Stack):
             runtime=lambda_.Runtime.PYTHON_3_12,
             code=lambda_.Code.from_asset("lambdas/telegram"),
             handler="handler.handler",
-            timeout=cdk.Duration.seconds(30),
+            timeout=cdk.Duration.seconds(10),
             environment={
                 "BOT_TOKEN_PARAM": bot_token_param.parameter_name,
-                "WORKOUT_TABLE_NAME": workout_table.table_name,
                 "ALLOWED_USER_IDS_PARAM": allowed_users_param.parameter_name,
+                "QUEUE_URL": queue.queue_url,
+            },
+        )
+
+        bot_token_param.grant_read(telegram_lambda)
+        allowed_users_param.grant_read(telegram_lambda)
+        queue.grant_send_messages(telegram_lambda)
+
+        # -------------------------------------------------------------------
+        # Processor Lambda — reads from SQS, calls AgentCore, replies to user
+        # -------------------------------------------------------------------
+
+        processor_lambda = lambda_.Function(
+            self,
+            "ProcessorLambda",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            code=lambda_.Code.from_asset("lambdas/processor"),
+            handler="handler.handler",
+            timeout=cdk.Duration.seconds(90),
+            environment={
+                "BOT_TOKEN_PARAM": bot_token_param.parameter_name,
                 "AGENT_RUNTIME_ARN": agent_runtime.attr_agent_runtime_arn,
             },
         )
 
-        # Allow Lambda to read bot token and allowed user IDs from SSM
-        bot_token_param.grant_read(telegram_lambda)
-        allowed_users_param.grant_read(telegram_lambda)
+        bot_token_param.grant_read(processor_lambda)
+        queue.grant_consume_messages(processor_lambda)
 
-        # Allow Lambda to invoke the AgentCore runtime
-        telegram_lambda.add_to_role_policy(
+        processor_lambda.add_event_source(
+            lambda_event_sources.SqsEventSource(queue, batch_size=1)
+        )
+
+        processor_lambda.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["bedrock-agentcore:InvokeAgentRuntime"],
                 resources=[
